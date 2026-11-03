@@ -1,0 +1,12 @@
+{
+  "name": "@apk-audio/editors-readiness",
+  "version": "1.0.0",
+  "description": "AV Equipment Staging & Commissioning Readiness Softapp",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/readiness.test.mjs"
+  },
+  "keywords": ["readiness", "staging", "commissioning", "av", "softapp", "apk.audio"],
+  "author": "Anthony Kuzub",
+  "license": "MIT"
+}

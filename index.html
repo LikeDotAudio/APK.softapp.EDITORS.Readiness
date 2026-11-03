@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Equipment Readiness & Commissioning Tracker — APK.audio</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #f97316;
+      --accent-hover: #ea580c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: ui-sans-serif, system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 24px; }
+    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+    h1 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .btn:hover { background: var(--border); }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .kpi-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .kpi-title { font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+    .kpi-value { font-size: 24px; font-weight: 700; }
+    .stages-bar { display: flex; gap: 6px; margin-bottom: 24px; background: var(--card-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; }
+    .stage-pill { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .groups-container { display: flex; flex-direction: column; gap: 16px; }
+    .group-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .group-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .group-title { font-size: 16px; font-weight: 600; }
+    .progress-bar-container { background: #0b1120; border-radius: 6px; height: 10px; width: 100%; overflow: hidden; margin-bottom: 12px; }
+    .progress-bar-fill { background: #22c55e; height: 100%; transition: width 0.3s ease; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { text-align: left; padding: 8px; color: var(--muted); border-bottom: 1px solid var(--border); }
+    td { padding: 8px; border-bottom: 1px solid #1e293b; }
+    select { background: #0f172a; border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span>🚦</span> AV Equipment Staging & Commissioning Readiness</h1>
+    <div>
+      <button class="btn" onclick="exportReadinessReport()">Export CSV Report</button>
+      <button class="btn btn-primary" onclick="markAllAirReady()">Mark All Air Ready</button>
+    </div>
+  </header>
+
+  <div class="summary-grid">
+    <div class="kpi-card">
+      <div class="kpi-title">Overall Staging Progress</div>
+      <div class="kpi-value" id="kpi-progress">0%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Staged Devices</div>
+      <div class="kpi-value" id="kpi-staged">0 / 0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Air Ready Groups</div>
+      <div class="kpi-value" id="kpi-air-ready">0 / 0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Estimated Time to Air</div>
+      <div class="kpi-value" id="kpi-eta" style="color: #22c55e;">Calculating...</div>
+    </div>
+  </div>
+
+  <div class="stages-bar" id="stages-legend"></div>
+
+  <div class="groups-container" id="groups-list"></div>
+
+  <script type="module">
+    import {
+      READINESS_STAGES,
+      readinessLabel,
+      calculateGroupReadiness,
+      readinessBadge,
+      estimateTimeToAir
+    } from './js/readinessApp.js';
+
+    let groups = [
+      {
+        id: 'grp-01',
+        name: 'Rack 01 — Core Audio Processing',
+        location: 'Equip Room 102 / Rack 01',
+        devices: [
+          { id: 'dev-101', name: 'Primary DSP Core Frame', ip: '192.168.10.11', stage: 'd8' },
+          { id: 'dev-102', name: 'Secondary Redundant DSP', ip: '192.168.10.12', stage: 'd7' },
+          { id: 'dev-103', name: 'AES67 / Dante Interface Bay', ip: '192.168.10.15', stage: 'd5' },
+          { id: 'dev-104', name: 'PTP Master Clock Generator', ip: '192.168.10.2', stage: 'd8' }
+        ]
+      },
+      {
+        id: 'grp-02',
+        name: 'Rack 02 — Managed AV Switches',
+        location: 'Equip Room 102 / Rack 02',
+        devices: [
+          { id: 'dev-201', name: 'Core Switch 01 (Primary Media)', ip: '192.168.1.2', stage: 'd6' },
+          { id: 'dev-202', name: 'Core Switch 02 (Secondary Media)', ip: '192.168.1.3', stage: 'd5' },
+          { id: 'dev-203', name: 'Out-of-Band Control Switch', ip: '192.168.1.4', stage: 'd4' }
+        ]
+      },
+      {
+        id: 'grp-03',
+        name: 'Studio Control Surface & Mon Bridge',
+        location: 'Control Room A',
+        devices: [
+          { id: 'dev-301', name: 'Main Fader Tile Console', ip: '192.168.10.50', stage: 'd3' },
+          { id: 'dev-302', name: 'Master Monitor Controller', ip: '192.168.10.51', stage: 'd3' },
+          { id: 'dev-303', name: 'Talkback Matrix Station', ip: '192.168.10.52', stage: 'd2' }
+        ]
+      }
+    ];
+
+    function renderStagesLegend() {
+      const container = document.getElementById('stages-legend');
+      container.innerHTML = READINESS_STAGES.map(s => `
+        <span class="stage-pill" style="background: ${s.color}22; color: ${s.color}; border: 1px solid ${s.color}66;">
+          <strong>${s.code}</strong> ${s.name}
+        </span>
+      `).join('');
+    }
+
+    function render() {
+      let totalDevices = 0;
+      let totalStaged = 0;
+      let totalPercentSum = 0;
+      let airReadyGroups = 0;
+      const allDevices = [];
+
+      const listContainer = document.getElementById('groups-list');
+      listContainer.innerHTML = groups.map(g => {
+        const stats = calculateGroupReadiness(g.devices);
+        totalDevices += stats.devices;
+        totalStaged += stats.staged;
+        totalPercentSum += stats.percent;
+        if (stats.isAirReady) airReadyGroups++;
+        allDevices.push(...g.devices);
+
+        return `
+          <div class="group-card">
+            <div class="group-header">
+              <div>
+                <div class="group-title">${g.name}</div>
+                <div style="font-size: 12px; color: var(--muted);">${g.location}</div>
+              </div>
+              <div style="text-align: right;">
+                <span class="stage-pill" style="background: ${stats.isAirReady ? '#22c55e' : '#f97316'}22; color: ${stats.isAirReady ? '#22c55e' : '#f97316'}; border: 1px solid currentColor;">
+                  ${readinessBadge(stats)}
+                </span>
+              </div>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" style="width: ${stats.percent}%;"></div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Device Name</th>
+                  <th>IP Address</th>
+                  <th>Stage</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${g.devices.map(d => `
+                  <tr>
+                    <td><strong>${d.name}</strong></td>
+                    <td><code>${d.ip}</code></td>
+                    <td>
+                      <select onchange="updateDeviceStage('${g.id}', '${d.id}', this.value)">
+                        ${READINESS_STAGES.map(s => `
+                          <option value="${s.code}" ${s.code === d.stage ? 'selected' : ''}>${s.code}: ${s.name}</option>
+                        `).join('')}
+                      </select>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }).join('');
+
+      const overallPercent = Math.round(totalPercentSum / groups.length);
+      document.getElementById('kpi-progress').textContent = `${overallPercent}%`;
+      document.getElementById('kpi-staged').textContent = `${totalStaged} / ${totalDevices}`;
+      document.getElementById('kpi-air-ready').textContent = `${airReadyGroups} / ${groups.length}`;
+
+      const eta = estimateTimeToAir(allDevices);
+      document.getElementById('kpi-eta').textContent = eta.status === 'Air Ready' ? 'Air Ready (Live)' : `${eta.daysRemaining} days remaining`;
+    }
+
+    window.updateDeviceStage = (groupId, deviceId, newStage) => {
+      const g = groups.find(x => x.id === groupId);
+      if (!g) return;
+      const d = g.devices.find(x => x.id === deviceId);
+      if (!d) return;
+      d.stage = newStage;
+      render();
+    };
+
+    window.markAllAirReady = () => {
+      groups.forEach(g => g.devices.forEach(d => d.stage = 'd8'));
+      render();
+    };
+
+    window.exportReadinessReport = () => {
+      const rows = [['Group', 'Location', 'Device', 'IP', 'Stage Code', 'Stage Name']];
+      groups.forEach(g => {
+        g.devices.forEach(d => {
+          rows.push([g.name, g.location, d.name, d.ip, d.stage, readinessLabel(d.stage)]);
+        });
+      });
+      const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'equipment_readiness_report.csv';
+      a.click();
+    };
+
+    renderStagesLegend();
+    render();
+  </script>
+</body>
+</html>

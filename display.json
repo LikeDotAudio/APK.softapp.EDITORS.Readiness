@@ -1,0 +1,12 @@
+{
+  "id": "EDITORS_Readiness",
+  "name": "Equipment Readiness",
+  "icon": "🚦",
+  "group": "Design",
+  "subGroup": "Project Management",
+  "role": "execution",
+  "description": "AV equipment staging & commissioning readiness rollup: tracks physical delivery, mounting, cabling, IP provisioning, and time-to-air per rack and system group.",
+  "app": "APK:Softapps/EDITORS/EDITORS.Readiness/index.html",
+  "route": "#/editors-readiness",
+  "topic": "APK.audio/Gui/Display/Readiness"
+}
