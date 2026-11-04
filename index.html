@@ -3,227 +3,196 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Equipment Readiness & Commissioning Tracker — APK.audio</title>
+  <title>Equipment Readiness & Commissioning Tracker</title>
+  <link rel="stylesheet" href="css/theme.css">
   <style>
-    :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --border: #334155;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --accent: #f97316;
-      --accent-hover: #ea580c;
+    .main-layout {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 70px);
+      padding: 16px;
+      gap: 16px;
+      box-sizing: border-box;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: ui-sans-serif, system-ui, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 24px; }
-    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
-    h1 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-    .btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-    .btn:hover { background: var(--border); }
-    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .btn-primary:hover { background: var(--accent-hover); }
-    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .kpi-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
-    .kpi-title { font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
-    .kpi-value { font-size: 24px; font-weight: 700; }
-    .stages-bar { display: flex; gap: 6px; margin-bottom: 24px; background: var(--card-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; }
-    .stage-pill { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-    .groups-container { display: flex; flex-direction: column; gap: 16px; }
-    .group-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
-    .group-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    .group-title { font-size: 16px; font-weight: 600; }
-    .progress-bar-container { background: #0b1120; border-radius: 6px; height: 10px; width: 100%; overflow: hidden; margin-bottom: 12px; }
-    .progress-bar-fill { background: #22c55e; height: 100%; transition: width 0.3s ease; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th { text-align: left; padding: 8px; color: var(--muted); border-bottom: 1px solid var(--border); }
-    td { padding: 8px; border-bottom: 1px solid #1e293b; }
-    select { background: #0f172a; border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+    .kpi-card {
+      background: var(--surface-primary, #121A2F);
+      border: 1px solid var(--border-color, #1E2A45);
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+    .kpi-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted, #8B9BB4);
+      margin-bottom: 4px;
+    }
+    .kpi-val {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-bright, #F0F4F8);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .progress-bar-container {
+      background: var(--surface-bg, #080C16);
+      border-radius: 4px;
+      height: 8px;
+      width: 100%;
+      overflow: hidden;
+      margin-top: 8px;
+      border: 1px solid var(--border-color, #1E2A45);
+    }
+    .progress-bar-fill {
+      background: #4ADE80;
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+    .panel {
+      background: var(--surface-primary, #121A2F);
+      border: 1px solid var(--border-color, #1E2A45);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+    }
+    .panel-header {
+      padding: 12px 16px;
+      background: var(--surface-secondary, #0E1424);
+      border-bottom: 1px solid var(--border-color, #1E2A45);
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-bright, #F0F4F8);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .table-container {
+      flex: 1;
+      overflow: auto;
+    }
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    table.data-table th {
+      background: var(--surface-secondary, #0E1424);
+      color: var(--text-muted, #8B9BB4);
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color, #1E2A45);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+    table.data-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-color, #1E2A45);
+      color: var(--text-bright, #F0F4F8);
+    }
+    .inline-cell {
+      background: rgba(255, 255, 255, 0.02);
+      cursor: text;
+    }
+    .inline-cell:focus {
+      outline: 1px solid var(--accent-orange, #F4902C);
+      background: rgba(244, 144, 44, 0.1);
+    }
+    .stage-select {
+      background: var(--surface-bg, #080C16);
+      border: 1px solid var(--border-color, #1E2A45);
+      border-radius: 4px;
+      color: var(--text-bright, #F0F4F8);
+      padding: 6px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      width: 100%;
+    }
+    .btn-delete {
+      background: transparent;
+      border: none;
+      color: #FF5A5A;
+      cursor: pointer;
+      font-weight: bold;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .btn-delete:hover {
+      background: rgba(255, 90, 90, 0.2);
+    }
   </style>
 </head>
-<body>
-  <header>
-    <h1><span>🚦</span> AV Equipment Staging & Commissioning Readiness</h1>
-    <div>
-      <button class="btn" onclick="exportReadinessReport()">Export CSV Report</button>
-      <button class="btn btn-primary" onclick="markAllAirReady()">Mark All Air Ready</button>
+<body class="deep-horizon">
+  <div class="window-header">
+    <div class="window-title">
+      <span class="window-icon">🚦</span>
+      <span class="window-text">Equipment Staging & Commissioning Readiness</span>
+      <span id="block-tag" class="block-tag">READINESS BLOCK</span>
     </div>
-  </header>
-
-  <div class="summary-grid">
-    <div class="kpi-card">
-      <div class="kpi-title">Overall Staging Progress</div>
-      <div class="kpi-value" id="kpi-progress">0%</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">Staged Devices</div>
-      <div class="kpi-value" id="kpi-staged">0 / 0</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">Air Ready Groups</div>
-      <div class="kpi-value" id="kpi-air-ready">0 / 0</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">Estimated Time to Air</div>
-      <div class="kpi-value" id="kpi-eta" style="color: #22c55e;">Calculating...</div>
+    <div class="window-actions">
+      <input type="text" id="prop-planName" placeholder="Readiness Plan Name" style="background: var(--surface-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; color: var(--text-bright); font-size: 12px; width: 220px;">
+      <button id="btn-open" class="btn-action">📂 Open Block</button>
+      <button id="btn-discovered" class="btn-action">⚡ Discovered</button>
+      <button id="btn-save" class="btn-action btn-primary">💾 Save & Return</button>
+      <button id="btn-close" class="btn-action btn-close">✕</button>
     </div>
   </div>
 
-  <div class="stages-bar" id="stages-legend"></div>
+  <div class="main-layout">
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Completion Level</div>
+        <div id="kpi-percent" class="kpi-val">0%</div>
+        <div class="progress-bar-container">
+          <div id="overall-progress-fill" class="progress-bar-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Bottleneck Stage (Min Rank)</div>
+        <div id="kpi-stage" class="kpi-val">---</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Assets In Flight</div>
+        <div id="kpi-staged" class="kpi-val">0 / 0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Est. Time To Air</div>
+        <div id="kpi-eta" class="kpi-val">---</div>
+      </div>
+    </div>
 
-  <div class="groups-container" id="groups-list"></div>
+    <div class="panel">
+      <div class="panel-header">
+        <span>Hardware Asset Commissioning Pipeline (d0 Unstaged → d8 Air Ready)</span>
+        <div style="display: flex; gap: 8px;">
+          <button id="btn-mark-all" class="btn-action btn-small" style="background: rgba(34, 197, 94, 0.2); border-color: #22c55e; color: #22c55e;">✓ Mark All Air Ready</button>
+          <button id="btn-add-device" class="btn-action btn-small">+ Add Hardware Asset</button>
+        </div>
+      </div>
 
-  <script type="module">
-    import {
-      READINESS_STAGES,
-      readinessLabel,
-      calculateGroupReadiness,
-      readinessBadge,
-      estimateTimeToAir
-    } from './js/readinessApp.js';
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 6%;">Asset #</th>
+              <th style="width: 35%;">Equipment Model & Description</th>
+              <th style="width: 20%;">Physical Location / Rack</th>
+              <th style="width: 25%;">Commissioning Stage</th>
+              <th style="width: 10%;">Target Date</th>
+              <th style="width: 4%; text-align: center;">Act</th>
+            </tr>
+          </thead>
+          <tbody id="device-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-    let groups = [
-      {
-        id: 'grp-01',
-        name: 'Rack 01 — Core Audio Processing',
-        location: 'Equip Room 102 / Rack 01',
-        devices: [
-          { id: 'dev-101', name: 'Primary DSP Core Frame', ip: '192.168.10.11', stage: 'd8' },
-          { id: 'dev-102', name: 'Secondary Redundant DSP', ip: '192.168.10.12', stage: 'd7' },
-          { id: 'dev-103', name: 'AES67 / Dante Interface Bay', ip: '192.168.10.15', stage: 'd5' },
-          { id: 'dev-104', name: 'PTP Master Clock Generator', ip: '192.168.10.2', stage: 'd8' }
-        ]
-      },
-      {
-        id: 'grp-02',
-        name: 'Rack 02 — Managed AV Switches',
-        location: 'Equip Room 102 / Rack 02',
-        devices: [
-          { id: 'dev-201', name: 'Core Switch 01 (Primary Media)', ip: '192.168.1.2', stage: 'd6' },
-          { id: 'dev-202', name: 'Core Switch 02 (Secondary Media)', ip: '192.168.1.3', stage: 'd5' },
-          { id: 'dev-203', name: 'Out-of-Band Control Switch', ip: '192.168.1.4', stage: 'd4' }
-        ]
-      },
-      {
-        id: 'grp-03',
-        name: 'Studio Control Surface & Mon Bridge',
-        location: 'Control Room A',
-        devices: [
-          { id: 'dev-301', name: 'Main Fader Tile Console', ip: '192.168.10.50', stage: 'd3' },
-          { id: 'dev-302', name: 'Master Monitor Controller', ip: '192.168.10.51', stage: 'd3' },
-          { id: 'dev-303', name: 'Talkback Matrix Station', ip: '192.168.10.52', stage: 'd2' }
-        ]
-      }
-    ];
-
-    function renderStagesLegend() {
-      const container = document.getElementById('stages-legend');
-      container.innerHTML = READINESS_STAGES.map(s => `
-        <span class="stage-pill" style="background: ${s.color}22; color: ${s.color}; border: 1px solid ${s.color}66;">
-          <strong>${s.code}</strong> ${s.name}
-        </span>
-      `).join('');
-    }
-
-    function render() {
-      let totalDevices = 0;
-      let totalStaged = 0;
-      let totalPercentSum = 0;
-      let airReadyGroups = 0;
-      const allDevices = [];
-
-      const listContainer = document.getElementById('groups-list');
-      listContainer.innerHTML = groups.map(g => {
-        const stats = calculateGroupReadiness(g.devices);
-        totalDevices += stats.devices;
-        totalStaged += stats.staged;
-        totalPercentSum += stats.percent;
-        if (stats.isAirReady) airReadyGroups++;
-        allDevices.push(...g.devices);
-
-        return `
-          <div class="group-card">
-            <div class="group-header">
-              <div>
-                <div class="group-title">${g.name}</div>
-                <div style="font-size: 12px; color: var(--muted);">${g.location}</div>
-              </div>
-              <div style="text-align: right;">
-                <span class="stage-pill" style="background: ${stats.isAirReady ? '#22c55e' : '#f97316'}22; color: ${stats.isAirReady ? '#22c55e' : '#f97316'}; border: 1px solid currentColor;">
-                  ${readinessBadge(stats)}
-                </span>
-              </div>
-            </div>
-            <div class="progress-bar-container">
-              <div class="progress-bar-fill" style="width: ${stats.percent}%;"></div>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Device Name</th>
-                  <th>IP Address</th>
-                  <th>Stage</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${g.devices.map(d => `
-                  <tr>
-                    <td><strong>${d.name}</strong></td>
-                    <td><code>${d.ip}</code></td>
-                    <td>
-                      <select onchange="updateDeviceStage('${g.id}', '${d.id}', this.value)">
-                        ${READINESS_STAGES.map(s => `
-                          <option value="${s.code}" ${s.code === d.stage ? 'selected' : ''}>${s.code}: ${s.name}</option>
-                        `).join('')}
-                      </select>
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        `;
-      }).join('');
-
-      const overallPercent = Math.round(totalPercentSum / groups.length);
-      document.getElementById('kpi-progress').textContent = `${overallPercent}%`;
-      document.getElementById('kpi-staged').textContent = `${totalStaged} / ${totalDevices}`;
-      document.getElementById('kpi-air-ready').textContent = `${airReadyGroups} / ${groups.length}`;
-
-      const eta = estimateTimeToAir(allDevices);
-      document.getElementById('kpi-eta').textContent = eta.status === 'Air Ready' ? 'Air Ready (Live)' : `${eta.daysRemaining} days remaining`;
-    }
-
-    window.updateDeviceStage = (groupId, deviceId, newStage) => {
-      const g = groups.find(x => x.id === groupId);
-      if (!g) return;
-      const d = g.devices.find(x => x.id === deviceId);
-      if (!d) return;
-      d.stage = newStage;
-      render();
-    };
-
-    window.markAllAirReady = () => {
-      groups.forEach(g => g.devices.forEach(d => d.stage = 'd8'));
-      render();
-    };
-
-    window.exportReadinessReport = () => {
-      const rows = [['Group', 'Location', 'Device', 'IP', 'Stage Code', 'Stage Name']];
-      groups.forEach(g => {
-        g.devices.forEach(d => {
-          rows.push([g.name, g.location, d.name, d.ip, d.stage, readinessLabel(d.stage)]);
-        });
-      });
-      const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'equipment_readiness_report.csv';
-      a.click();
-    };
-
-    renderStagesLegend();
-    render();
-  </script>
+  <script type="module" src="js/readinessApp.js"></script>
 </body>
 </html>

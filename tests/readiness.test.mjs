@@ -9,6 +9,7 @@ import {
   readinessTitle,
   estimateTimeToAir
 } from '../js/readinessApp.js';
+import { ReadinessModel } from '../js/readinessModel.js';
 
 test('Readiness stages definition', () => {
   assert.equal(READINESS_STAGES.length, 9);
@@ -70,4 +71,18 @@ test('estimateTimeToAir estimates timeline based on completion', () => {
   const eta = estimateTimeToAir(devices);
   assert.equal(eta.status, 'In Progress');
   assert.ok(eta.daysRemaining > 0);
+});
+
+test('ReadinessModel exports and imports block schemas correctly', () => {
+  const model = new ReadinessModel('STUDIO-A-COMMISSIONING');
+  assert.equal(model.devices.length, 5);
+
+  const block = model.toBlock();
+  assert.equal(block.type, 'readiness_rollup');
+  assert.equal(block.planName, 'STUDIO-A-COMMISSIONING');
+
+  const restored = new ReadinessModel();
+  restored.fromBlock(block);
+  assert.equal(restored.planName, 'STUDIO-A-COMMISSIONING');
+  assert.equal(restored.devices.length, 5);
 });
