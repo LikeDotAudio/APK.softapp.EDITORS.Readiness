@@ -3,12 +3,11 @@
 // MIT Licence. Free, for everyone, forever.
 /* The block goes in and out over cad.like.audio/host@1 (window.APKSoftapp.connectHost,
    vendor/apk-softapp/); the pipeline is APKTable 'readiness-assets' (vendor/apk-table/).
-   "Discovered" lists what the bus knows (js/discoveredPanel.js, kinds in
+   "Discovered" lists what the bus knows (APKSoftapp.discoveredPanel, kinds in
    config/discovery.json): an asset can be added from it, and every asset with a
    MAC or serial shows whether the network sees it now (live state + why). */
 
 import { ReadinessModel, READINESS_BLOCK_TYPE } from './readinessModel.js';
-import { DiscoveredPanel } from './discoveredPanel.js';
 
 export { ReadinessModel };
 
@@ -113,14 +112,37 @@ export class ReadinessApp {
       onLoad: (b, m) => this.handleBlockLoaded(b, m),
       onRequest: () => this.model.toBlock()
     });
-    this.discovered = new DiscoveredPanel({
-      tableId: 'readiness-discovered',
-      tableHost: document.getElementById('discovered-table'),
-      statusEl: document.getElementById('discovered-status'),
-      configUrl: new URL('../config/discovery.json', import.meta.url),
-      pickLabel: 'Add asset',
-      onPick: (thing) => { if (this.model.addFromThing(thing)) this.changed(); },
-      onThings: (things) => { this.things = things; this.renderTable({ fromBus: true }); }
+    // the Discovered panel is the shared client's (ROAD-3502); start() draws it once, on first show
+    this.discovered = {
+      start: () => (this.discoveredRun ||= window.APKSoftapp?.discoveredPanel(document.getElementById('discovered-table'), {
+        id: 'readiness-discovered',
+        status: document.getElementById('discovered-status'),
+        configUrl: new URL('../config/discovery.json', import.meta.url),
+        pickLabel: 'Add asset',
+        onPick: (thing) => { if (this.model.addFromThing(thing)) this.changed(); },
+        onChange: (things) => { this.things = things; this.renderTable({ fromBus: true }); }
+      })),
+    };
+    S.describe({
+      name: 'Equipment Readiness',
+      does: 'Tracks every hardware asset through the commissioning stages (Unstaged → Air Ready), rolls them up into a percent, stage and time-to-air, and shows whether the network sees each asset now.',
+      inputs: [
+        { name: 'Readiness block', from: 'the CAD drawing when opened from the CAD', kind: 'cad' },
+        { name: 'Block file', from: 'a .json file picked with Open Block', kind: 'file' },
+        { name: 'On the network', from: 'what the bus has discovered (scanners, agents, presence); which kinds show is config/discovery.json', kind: 'bus' },
+      ],
+      outputs: [
+        { name: 'Readiness block', to: 'the CAD drawing on Save & Return, or a .json download when standalone', kind: 'file' },
+      ],
+      controls: [
+        { name: 'Plan name', how: 'Type in the plan name box (top bar)' },
+        { name: 'Add hardware asset', how: '+ Add Hardware Asset, then edit its cells; or Add asset on a row in Discovered' },
+        { name: 'Commissioning stage', how: 'Pick D0–D8 in the asset row' },
+        { name: 'Mark all Air Ready', how: '✓ Mark All Air Ready' },
+        { name: 'Show what is on the network', how: '⚡ Discovered (top bar)' },
+        { name: 'Save & Return / Close', how: 'Top-bar buttons' },
+      ],
+      problems: ['file_unreadable', 'bad_json', 'bad_input', 'bus_missing', 'device_stale'],
     });
     this.initControls();
     this.render();
@@ -128,10 +150,18 @@ export class ReadinessApp {
   }
 
   handleBlockLoaded(block, meta = {}) {
-    if (!this.model.fromBlock(block)) return;
+    if (!this.model.fromBlock(block)) {
+      window.APKSoftapp.showProblem('bad_input', {
+        subject: meta.title || meta.blockName || 'Readiness block',
+        detail: 'This is not a readiness plan: it has no "devices" list.',
+        fix: ['Open a .json saved by this editor (it has a "devices" list), or start a new plan with + Add Hardware Asset.'],
+      });
+      return false;
+    }
     const tag = document.getElementById('block-tag');
     if (tag && (meta.title || meta.blockName)) tag.textContent = meta.title || meta.blockName;
     this.render();
+    return true;
   }
 
   changed() {
@@ -151,15 +181,19 @@ export class ReadinessApp {
       input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        const S = window.APKSoftapp;
         const reader = new FileReader();
         reader.onload = (evt) => {
+          let block;
           try {
-            this.handleBlockLoaded(JSON.parse(evt.target.result), { title: file.name });
-            this.host.changed(this.model.toBlock());
+            block = JSON.parse(evt.target.result);
           } catch (err) {
-            alert('Invalid block file: ' + err.message);
+            S.showProblem('bad_json', { subject: file.name, detail: err.message, onRetry: () => input.click() });
+            return;
           }
+          if (this.handleBlockLoaded(block, { title: file.name })) this.host.changed(this.model.toBlock());
         };
+        reader.onerror = () => S.showProblem('file_unreadable', { subject: file.name, detail: reader.error && reader.error.message, onRetry: () => input.click() });
         reader.readAsText(file);
       };
       input.click();
