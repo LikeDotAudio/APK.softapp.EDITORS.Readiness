@@ -1,9 +1,14 @@
 // Equipment Staging & Commissioning Readiness Engine
 // Part of the APK.audio project — http://APK.audio — Anthony Kuzub
 // MIT Licence. Free, for everyone, forever.
+/* The block goes in and out over cad.like.audio/host@1 (window.APKSoftapp.connectHost,
+   vendor/apk-softapp/); the pipeline is APKTable 'readiness-assets' (vendor/apk-table/).
+   "Discovered" lists what the bus knows (js/discoveredPanel.js, kinds in
+   config/discovery.json): an asset can be added from it, and every asset with a
+   MAC or serial shows whether the network sees it now (live state + why). */
 
-import { BlockBridge } from './blockBridge.js';
-import { ReadinessModel } from './readinessModel.js';
+import { ReadinessModel, READINESS_BLOCK_TYPE } from './readinessModel.js';
+import { DiscoveredPanel } from './discoveredPanel.js';
 
 export { ReadinessModel };
 
@@ -98,121 +103,94 @@ export function estimateTimeToAir(devices = [], targetAirDate = null) {
 export class ReadinessApp {
   constructor() {
     this.model = new ReadinessModel();
-    this.bridge = new BlockBridge({
-      name: 'Equipment Readiness',
-      type: 'readiness_rollup',
-      onBlockLoaded: (b, m) => this.handleBlockLoaded(b, m),
-      onBlockChanged: () => this.render()
+    this.things = [];
+    const S = window.APKSoftapp;
+    S.inheritTheme();
+    this.tableHost = document.getElementById('device-table');
+    this.host = S.connectHost({
+      editor: 'Equipment Readiness',
+      blockType: READINESS_BLOCK_TYPE,
+      onLoad: (b, m) => this.handleBlockLoaded(b, m),
+      onRequest: () => this.model.toBlock()
     });
-
-    this.tableBody = document.getElementById('device-table-body');
+    this.discovered = new DiscoveredPanel({
+      tableId: 'readiness-discovered',
+      tableHost: document.getElementById('discovered-table'),
+      statusEl: document.getElementById('discovered-status'),
+      configUrl: new URL('../config/discovery.json', import.meta.url),
+      pickLabel: 'Add asset',
+      onPick: (thing) => { if (this.model.addFromThing(thing)) this.changed(); },
+      onThings: (things) => { this.things = things; this.renderTable({ fromBus: true }); }
+    });
     this.initControls();
     this.render();
-    this.autoConnect();
+    this.discovered.start();
   }
 
-  async autoConnect() {
-    const discovered = await this.bridge.fetchDiscoveredProject();
-    if (discovered && discovered.readiness && discovered.readiness.length > 0) {
-      this.model.fromBlock(discovered.readiness[0]);
-      this.render();
-    } else if (discovered && discovered.devices && discovered.devices.length > 0) {
-      this.model.devices = discovered.devices.map((d, i) => ({
-        id: d.id || `dev-${i + 1}`,
-        name: d.name || d.model || 'Discovered Asset',
-        location: d.location || d.rack || 'Rack 01',
-        stage: 'd2',
-        targetDate: '2026-11-20'
-      }));
-      this.render();
-    }
+  handleBlockLoaded(block, meta = {}) {
+    if (!this.model.fromBlock(block)) return;
+    const tag = document.getElementById('block-tag');
+    if (tag && (meta.title || meta.blockName)) tag.textContent = meta.title || meta.blockName;
+    this.render();
   }
 
-  handleBlockLoaded(block, meta) {
-    if (block) {
-      this.model.fromBlock(block);
-      this.render();
-    }
+  changed() {
+    this.render();
+    this.host.changed(this.model.toBlock());
   }
 
   initControls() {
-    const btnSave = document.getElementById('btn-save');
-    if (btnSave) {
-      btnSave.addEventListener('click', () => {
-        this.bridge.saveBlock(this.model.toBlock(), { name: this.model.planName });
-      });
-    }
+    document.getElementById('btn-save')?.addEventListener('click', () => {
+      this.host.save(this.model.toBlock(), { title: this.model.planName, filename: this.model.planName });
+    });
 
-    const btnOpen = document.getElementById('btn-open');
-    if (btnOpen) {
-      btnOpen.addEventListener('click', () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
-        input.onchange = (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-            try {
-              const data = JSON.parse(evt.target.result);
-              this.model.fromBlock(data);
-              this.render();
-            } catch (err) {
-              alert('Invalid block file: ' + err.message);
-            }
-          };
-          reader.readAsText(file);
+    document.getElementById('btn-open')?.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            this.handleBlockLoaded(JSON.parse(evt.target.result), { title: file.name });
+            this.host.changed(this.model.toBlock());
+          } catch (err) {
+            alert('Invalid block file: ' + err.message);
+          }
         };
-        input.click();
-      });
-    }
+        reader.readAsText(file);
+      };
+      input.click();
+    });
 
-    const btnClose = document.getElementById('btn-close');
-    if (btnClose) {
-      btnClose.addEventListener('click', () => this.bridge.close());
-    }
+    document.getElementById('btn-close')?.addEventListener('click', () => this.host.close());
 
-    const btnDiscovered = document.getElementById('btn-discovered');
-    if (btnDiscovered) {
-      btnDiscovered.addEventListener('click', async () => {
-        await this.autoConnect();
-      });
-    }
+    document.getElementById('btn-discovered')?.addEventListener('click', () => {
+      const panel = document.getElementById('discovered-panel');
+      if (panel) panel.hidden = !panel.hidden;
+    });
 
-    const btnAddDev = document.getElementById('btn-add-device');
-    if (btnAddDev) {
-      btnAddDev.addEventListener('click', () => {
-        this.model.addDevice();
-        this.render();
-        this.bridge.notifyChanged();
-      });
-    }
+    document.getElementById('btn-add-device')?.addEventListener('click', () => {
+      this.model.addDevice();
+      this.changed();
+    });
 
-    const btnMarkAll = document.getElementById('btn-mark-all');
-    if (btnMarkAll) {
-      btnMarkAll.addEventListener('click', () => {
-        this.model.setAllAirReady();
-        this.render();
-        this.bridge.notifyChanged();
-      });
-    }
+    document.getElementById('btn-mark-all')?.addEventListener('click', () => {
+      this.model.setAllAirReady();
+      this.changed();
+    });
 
-    const propPlan = document.getElementById('prop-planName');
-    if (propPlan) {
-      propPlan.addEventListener('input', (e) => {
-        this.model.planName = e.target.value;
-        this.bridge.notifyChanged();
-      });
-    }
+    document.getElementById('prop-planName')?.addEventListener('input', (e) => {
+      this.model.planName = e.target.value;
+      this.host.changed(this.model.toBlock());
+    });
   }
 
   render() {
     const propPlan = document.getElementById('prop-planName');
-    if (propPlan) {
-      propPlan.value = this.model.planName;
-    }
-
+    if (propPlan && propPlan !== document.activeElement) propPlan.value = this.model.planName;
     this.renderKPIs();
     this.renderTable();
   }
@@ -240,66 +218,62 @@ export class ReadinessApp {
     }
   }
 
-  renderTable() {
-    if (!this.tableBody) return;
-    this.tableBody.innerHTML = '';
-
-    const stageOptions = (currentStage) => {
-      return READINESS_STAGES.map(s => `
-        <option value="${s.code}" ${s.code === currentStage ? 'selected' : ''}>
-          ${s.code.toUpperCase()}: ${s.name}
-        </option>
-      `).join('');
-    };
-
-    this.model.devices.forEach((dev, idx) => {
-      const tr = document.createElement('tr');
-      const stageObj = READINESS_STAGES.find(s => s.code === dev.stage) || READINESS_STAGES[0];
-
-      tr.innerHTML = `
-        <td style="color: var(--text-muted); font-size: 11px;">#${dev.id}</td>
-        <td class="inline-cell" contenteditable="true" data-idx="${idx}" data-field="name">${dev.name}</td>
-        <td class="inline-cell" contenteditable="true" data-idx="${idx}" data-field="location">${dev.location}</td>
-        <td>
-          <select class="control-select stage-select" data-idx="${idx}" data-field="stage" style="border-left: 3px solid ${stageObj.color};">
-            ${stageOptions(dev.stage)}
-          </select>
-        </td>
-        <td class="inline-cell" contenteditable="true" data-idx="${idx}" data-field="targetDate">${dev.targetDate}</td>
-        <td style="text-align: center;">
-          <button class="btn-delete" data-idx="${idx}" title="Delete Device">✕</button>
-        </td>
-      `;
-
-      this.tableBody.appendChild(tr);
+  stageCell(dev) {
+    const stageObj = READINESS_STAGES.find(s => s.code === dev.stage) || READINESS_STAGES[0];
+    const sel = document.createElement('select');
+    sel.className = 'control-select stage-select';
+    sel.style.borderLeft = `3px solid ${stageObj.color}`;
+    READINESS_STAGES.forEach((s) => {
+      const op = document.createElement('option');
+      op.value = s.code;
+      op.textContent = `${s.code.toUpperCase()}: ${s.name}`;
+      op.title = s.desc;
+      if (s.code === dev.stage) op.selected = true;
+      sel.appendChild(op);
     });
-
-    this.tableBody.querySelectorAll('[contenteditable=true]').forEach(cell => {
-      cell.addEventListener('blur', (e) => {
-        const idx = parseInt(e.target.dataset.idx, 10);
-        const field = e.target.dataset.field;
-        this.model.updateDevice(idx, field, e.target.innerText.trim());
-        this.renderKPIs();
-        this.bridge.notifyChanged();
-      });
+    sel.addEventListener('change', () => {
+      dev.stage = sel.value;
+      this.changed();
     });
+    return sel;
+  }
 
-    this.tableBody.querySelectorAll('select.stage-select').forEach(sel => {
-      sel.addEventListener('change', (e) => {
-        const idx = parseInt(e.target.dataset.idx, 10);
-        this.model.updateDevice(idx, 'stage', e.target.value);
-        this.renderKPIs();
-        this.bridge.notifyChanged();
-      });
-    });
+  networkCell(dev) {
+    const [state, why] = this.model.networkState(dev, this.things);
+    const span = document.createElement('span');
+    if (state) span.setAttribute('data-apk-state', state);
+    span.textContent = state ? `${state}${why ? ' · ' + why : ''}` : why;
+    return span;
+  }
 
-    this.tableBody.querySelectorAll('.btn-delete').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const idx = parseInt(e.target.dataset.idx, 10);
-        this.model.removeDevice(idx);
-        this.render();
-        this.bridge.notifyChanged();
-      });
+  rows() {
+    return this.model.devices.map((d) => ({ ...d, network: this.model.networkState(d, this.things)[0] }));
+  }
+
+  renderTable({ fromBus = false } = {}) {
+    if (!this.tableHost) return;
+    if (this.table) {
+      // A bus update (re-judged every 15 s) waits while a cell is being typed in; the next tick catches up.
+      const a = document.activeElement;
+      if (fromBus && a && a.isContentEditable && this.tableHost.contains(a)) return;
+      this.table.setRows(this.rows());
+      return;
+    }
+    const dev = (i) => this.model.devices[i];
+    this.table = window.APKTable.create(this.tableHost, {
+      id: 'readiness-assets',
+      columns: [
+        { key: 'id', label: 'Asset #', editable: false, mono: true },
+        { key: 'name', label: 'Equipment Model & Description' },
+        { key: 'location', label: 'Physical Location / Rack' },
+        { key: 'stage', label: 'Commissioning Stage', render: (_v, _row, i) => this.stageCell(dev(i)) },
+        { key: 'targetDate', label: 'Target Date', mono: true },
+        { key: 'network', label: 'On the network', render: (_v, _row, i) => this.networkCell(dev(i)) },
+      ],
+      rows: this.rows(),
+      onEdit: (i, key, value) => { this.model.updateDevice(i, key, String(value).trim()); this.renderKPIs(); this.host.changed(this.model.toBlock()); },
+      onDelete: (i) => { this.model.removeDevice(i); this.changed(); },
+      empty: 'No hardware assets yet.'
     });
   }
 }

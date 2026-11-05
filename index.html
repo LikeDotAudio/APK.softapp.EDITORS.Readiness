@@ -6,6 +6,7 @@
   <title>Equipment Readiness & Commissioning Tracker</title>
   <link rel="stylesheet" href="./vendor/apk-contracts/apk-tokens.css">
   <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="./vendor/apk-table/apk-table.css">
   <style>
     .main-layout {
       display: flex;
@@ -77,25 +78,6 @@
       flex: 1;
       overflow: auto;
     }
-    table.data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-    }
-    table.data-table th {
-      background: var(--surface-secondary, #0f0f11);
-      color: var(--text-muted, #888888);
-      padding: 10px 12px;
-      text-align: left;
-      border-bottom: 1px solid var(--border-color, #2c2c2c);
-      font-size: 11px;
-      text-transform: uppercase;
-    }
-    table.data-table td {
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--border-color, #2c2c2c);
-      color: var(--text-bright, #f4f4f5);
-    }
     .inline-cell {
       background: rgba(255, 255, 255, 0.02);
       cursor: text;
@@ -126,6 +108,11 @@
     .btn-delete:hover {
       background: rgba(255, 90, 90, 0.2);
     }
+    .discovered-panel { flex: 0 0 auto; max-height: 40vh; overflow: auto; margin-bottom: 12px; }
+    .discovered-panel[hidden] { display: none; }
+    [data-apk-state="good"] { color: var(--apk-state-good); }
+    [data-apk-state="kinda"] { color: var(--apk-state-kinda); }
+    [data-apk-state="dead"] { color: var(--apk-state-dead); }
   </style>
 </head>
 <body class="deep-horizon">
@@ -138,7 +125,7 @@
     <div class="window-actions">
       <input type="text" id="prop-planName" placeholder="Readiness Plan Name" style="background: var(--surface-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; color: var(--text-bright); font-size: 12px; width: 220px;">
       <button id="btn-open" class="btn-action">📂 Open Block</button>
-      <button id="btn-discovered" class="btn-action">⚡ Discovered</button>
+      <button id="btn-discovered" class="btn-action" title="Show what is on the network (the bus), live">⚡ Discovered</button>
       <button id="btn-save" class="btn-action btn-primary">💾 Save & Return</button>
       <button id="btn-close" class="btn-action btn-close">✕</button>
     </div>
@@ -167,6 +154,14 @@
       </div>
     </div>
 
+    <section id="discovered-panel" class="panel discovered-panel" hidden>
+      <div class="panel-header">
+        <span>On the network</span>
+        <span id="discovered-status" class="discovered-status" data-apk-state="kinda">Not started.</span>
+      </div>
+      <div id="discovered-table"></div>
+    </section>
+
     <div class="panel">
       <div class="panel-header">
         <span>Hardware Asset Commissioning Pipeline (d0 Unstaged → d8 Air Ready)</span>
@@ -177,23 +172,15 @@
       </div>
 
       <div class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 6%;">Asset #</th>
-              <th style="width: 35%;">Equipment Model & Description</th>
-              <th style="width: 20%;">Physical Location / Rack</th>
-              <th style="width: 25%;">Commissioning Stage</th>
-              <th style="width: 10%;">Target Date</th>
-              <th style="width: 4%; text-align: center;">Act</th>
-            </tr>
-          </thead>
-          <tbody id="device-table-body"></tbody>
-        </table>
+        <div id="device-table"></div>
       </div>
     </div>
   </div>
 
+  <script src="./vendor/apk-contracts/apk-contracts.global.js"></script>
+  <script src="/FrontEnd/shared/apk-bus.js"></script>
+  <script src="./vendor/apk-softapp/apk-softapp.js"></script>
+  <script src="./vendor/apk-table/apk-table.js"></script>
   <script type="module" src="js/readinessApp.js"></script>
 </body>
 </html>
