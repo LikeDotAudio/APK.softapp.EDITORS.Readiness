@@ -5,9 +5,13 @@
    vendor/apk-softapp/); the pipeline is APKTable 'readiness-assets' (vendor/apk-table/).
    "Discovered" lists what the bus knows (APKSoftapp.discoveredPanel, kinds in
    config/discovery.json): an asset can be added from it, and every asset with a
-   MAC or serial shows whether the network sees it now (live state + why). */
+   MAC or serial shows whether the network sees it now (live state + why).
+   bom-fm-4: Open takes a rig .ifc (Open Bench = GET /api/bim/bench.ifc) — one asset per device
+   occurrence, located where the model contains it — and standalone Save writes the block AND its .ifc
+   twin (APKSoftapp.saveModel; js/readinessIfc.js: IfcWorkSchedule, one IfcTask per device). */
 
 import { ReadinessModel, READINESS_BLOCK_TYPE } from './readinessModel.js';
+import { readinessToIfc } from './readinessIfc.js';
 import { libraryButton, acceptLibraryDrops, bimFields } from './bimLibrary.js';
 
 export { ReadinessModel };
@@ -129,12 +133,14 @@ export class ReadinessApp {
       does: 'Tracks every hardware asset through the commissioning stages (Unstaged → Air Ready), rolls them up into a percent, stage and time-to-air, and shows whether the network sees each asset now.',
       inputs: [
         { name: 'Readiness block', from: 'the CAD drawing when opened from the CAD', kind: 'cad' },
-        { name: 'Block file', from: 'a .json file picked with Open Block', kind: 'file' },
+        { name: 'Block file', from: 'a .json file picked with Open', kind: 'file' },
+        { name: 'Rig model (.ifc)', from: 'Open an .ifc, or Open Bench (GET /api/bim/bench.ifc): one asset per device occurrence, its location the model\'s space', kind: 'file' },
         { name: 'Device library', from: 'the BIM library (📚 Library, Ctrl+Shift+L, or a part dragged onto the table): each asset keeps its bimId and bimRef' },
         { name: 'On the network', from: 'what the bus has discovered (scanners, agents, presence); which kinds show is config/discovery.json', kind: 'bus' },
       ],
       outputs: [
-        { name: 'Readiness block', to: 'the CAD drawing on Save & Return, or a .json download when standalone', kind: 'file' },
+        { name: 'Readiness block', to: 'the CAD drawing on Save & Return', kind: 'file' },
+        { name: '<plan>.json + <plan>.ifc', to: 'standalone Save: the block and its IFC4X3 twin (IfcWorkSchedule, an IfcTask per device, over the rig)', kind: 'file' },
       ],
       controls: [
         { name: 'Plan name', how: 'Type in the plan name box (top bar)' },
@@ -142,7 +148,7 @@ export class ReadinessApp {
         { name: 'Commissioning stage', how: 'Pick D0–D8 in the asset row' },
         { name: 'Mark all Air Ready', how: '✓ Mark All Air Ready' },
         { name: 'Show what is on the network', how: '⚡ Discovered (top bar)' },
-        { name: 'Save & Return / Close', how: 'Top-bar buttons' },
+        { name: 'Open / Open Bench / Save & Return / Close', how: 'Top-bar buttons (Open takes .ifc or .json)' },
       ],
       problems: ['file_unreadable', 'bad_json', 'bad_input', 'bus_missing', 'device_stale'],
     });
@@ -172,34 +178,9 @@ export class ReadinessApp {
   }
 
   initControls() {
-    document.getElementById('btn-save')?.addEventListener('click', () => {
-      this.host.save(this.model.toBlock(), { title: this.model.planName, filename: this.model.planName });
-    });
-
-    document.getElementById('btn-open')?.addEventListener('click', () => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.json';
-      input.onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const S = window.APKSoftapp;
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          let block;
-          try {
-            block = JSON.parse(evt.target.result);
-          } catch (err) {
-            S.showProblem('bad_json', { subject: file.name, detail: err.message, onRetry: () => input.click() });
-            return;
-          }
-          if (this.handleBlockLoaded(block, { title: file.name })) this.host.changed(this.model.toBlock());
-        };
-        reader.onerror = () => S.showProblem('file_unreadable', { subject: file.name, detail: reader.error && reader.error.message, onRetry: () => input.click() });
-        reader.readAsText(file);
-      };
-      input.click();
-    });
+    document.getElementById('btn-save')?.addEventListener('click', () => this.save());
+    document.getElementById('btn-open')?.addEventListener('click', () => this.open());
+    document.getElementById('btn-open-bench')?.addEventListener('click', () => this.open({ url: '/api/bim/bench.ifc' }));
 
     document.getElementById('btn-close')?.addEventListener('click', () => this.host.close());
 
@@ -223,6 +204,38 @@ export class ReadinessApp {
       this.model.planName = e.target.value;
       this.host.changed(this.model.toBlock());
     });
+  }
+
+  /** In the CAD: the block goes back (Save & Return). Standalone: the block and its .ifc twin, both or neither. */
+  async save() {
+    const S = window.APKSoftapp;
+    if (window.parent === window) {
+      const r = await S.saveModel(this.model, { name: this.model.planName || 'readiness', toIfc: (m) => readinessToIfc(m), toJson: (m) => m.toBlock() });
+      if (!r.ok && !r.cancelled && r.problem) S.showProblem(r.problem);
+      return r;
+    }
+    return this.host.save(this.model.toBlock(), { title: this.model.planName, filename: this.model.planName });
+  }
+
+  /** Open an .ifc (a rig, a bench, or a twin this editor saved) or a readiness block .json. */
+  async open(opts = {}) {
+    const S = window.APKSoftapp;
+    const o = await S.openModel({
+      ...opts,
+      fromIfc: (text, name) => { this.model.loadIfc(text, name); return this.model; },
+      fromJson: (data) => {
+        if (!this.model.fromBlock(data)) throw new TypeError('this is not a readiness plan: it has no "devices" list');
+        return this.model;
+      },
+    });
+    if (!o.ok) {
+      if (!o.cancelled && o.problem) S.showProblem(o.problem, { onRetry: () => this.open(opts) });
+      return o;
+    }
+    const tag = document.getElementById('block-tag');
+    if (tag) tag.textContent = o.name || 'Readiness plan';
+    this.changed();
+    return o;
   }
 
   render() {
@@ -269,7 +282,7 @@ export class ReadinessApp {
       sel.appendChild(op);
     });
     sel.addEventListener('change', () => {
-      dev.stage = sel.value;
+      this.model.setStage(dev, sel.value);   // records the day each stage was reached
       this.changed();
     });
     return sel;

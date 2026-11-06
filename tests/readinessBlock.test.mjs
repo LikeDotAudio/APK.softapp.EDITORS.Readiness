@@ -24,7 +24,9 @@ test('Readiness: the CAD loads a block, asks for it back, gets the same assets a
   assert.equal(ready.m.blockType, READINESS_BLOCK_TYPE);
   assert.equal(model.planName, 'ROOM-A');
   assert.equal(saved.o, ORIGIN);
-  assert.deepEqual(saved.m.block, block);
+  assert.deepEqual(saved.m.block.devices, block.devices);
+  assert.deepEqual([saved.m.block.type, saved.m.block.id, saved.m.block.planName], [block.type, block.id, block.planName]);
+  assert.equal(saved.m.block.schema, 'apk.readiness/2');
   assert.equal(w.downloads.length, 0, 'no download when embedded');
 });
 
