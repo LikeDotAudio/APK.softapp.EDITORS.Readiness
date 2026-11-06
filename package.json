@@ -1,6 +1,6 @@
 {
   "name": "@apk-audio/editors-readiness",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "AV Equipment Staging & Commissioning Readiness Softapp",
   "type": "module",
   "scripts": {
