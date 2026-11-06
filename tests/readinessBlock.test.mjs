@@ -45,13 +45,14 @@ test('Readiness: the network state of an asset follows the thing, unseen is dead
   assert.deepEqual(model.networkState(d, [amp]), ['good', 'verified 4s ago']);
   assert.deepEqual(model.networkState(d, [{ ...amp, live: { state: 'kinda', why: 'last verified 6 min ago' } }]), ['kinda', 'last verified 6 min ago']);
   assert.equal(model.networkState(d, [])[0], 'dead');
-  assert.equal(model.networkState(model.devices[0], [amp])[0], '', 'an asset with no MAC/serial is not judged');
+  assert.equal(model.networkState(model.addFromPart({ id: 'qsc/core-110f' }), [amp])[0], '', 'an asset with no MAC/serial is not judged');
 });
 
 test('Readiness: a load from another origin is ignored', () => {
   const model = new ReadinessModel();
   const w = world();
   connect(model)(w.S);
+  model.addDevice({ id: 'dev-1', name: 'DSP' });
   w.fire({ protocol: PROTOCOL, type: 'load', block: { devices: [] } }, { origin: 'http://other:8080' });
   assert.ok(model.devices.length > 0);
 });

@@ -75,7 +75,13 @@ test('estimateTimeToAir estimates timeline based on completion', () => {
 
 test('ReadinessModel exports and imports block schemas correctly', () => {
   const model = new ReadinessModel('STUDIO-A-COMMISSIONING');
+  assert.equal(model.devices.length, 0, 'no demo assets: each is a BIM part (ROAD-3572)');
+  const ref = { part: 'qsc/core-110f', url: 'http://bench:8160/api/bim/parts/qsc/core-110f', rev: 'r1' };
+  for (let i = 0; i < 4; i++) model.addFromPart({ id: 'qsc/core-110f', name: 'Q-SYS Core 110f DSP' }, ref);
+  model.addDevice({ id: 'dev-old', name: 'typed by hand before', stage: 'd4' });
   assert.equal(model.devices.length, 5);
+  assert.deepEqual([model.devices[0].name, model.devices[0].bimId, model.devices[0].stage], ['Q-SYS Core 110f DSP', 'qsc/core-110f', 'd0']);
+  assert.deepEqual(model.devices[0].bimRef, ref);
 
   const block = model.toBlock();
   assert.equal(block.type, 'readiness_rollup');
@@ -85,4 +91,6 @@ test('ReadinessModel exports and imports block schemas correctly', () => {
   restored.fromBlock(block);
   assert.equal(restored.planName, 'STUDIO-A-COMMISSIONING');
   assert.equal(restored.devices.length, 5);
+  assert.deepEqual(restored.devices[1].bimRef, ref, 'the BIM reference is saved with the block');
+  assert.equal(restored.devices[4].name, 'typed by hand before', 'an asset typed in before stays readable');
 });

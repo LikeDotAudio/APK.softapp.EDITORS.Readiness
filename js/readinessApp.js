@@ -8,6 +8,7 @@
    MAC or serial shows whether the network sees it now (live state + why). */
 
 import { ReadinessModel, READINESS_BLOCK_TYPE } from './readinessModel.js';
+import { libraryButton, acceptLibraryDrops, bimFields } from './bimLibrary.js';
 
 export { ReadinessModel };
 
@@ -129,6 +130,7 @@ export class ReadinessApp {
       inputs: [
         { name: 'Readiness block', from: 'the CAD drawing when opened from the CAD', kind: 'cad' },
         { name: 'Block file', from: 'a .json file picked with Open Block', kind: 'file' },
+        { name: 'Device library', from: 'the BIM library (📚 Library, Ctrl+Shift+L, or a part dragged onto the table): each asset keeps its bimId and bimRef' },
         { name: 'On the network', from: 'what the bus has discovered (scanners, agents, presence); which kinds show is config/discovery.json', kind: 'bus' },
       ],
       outputs: [
@@ -136,7 +138,7 @@ export class ReadinessApp {
       ],
       controls: [
         { name: 'Plan name', how: 'Type in the plan name box (top bar)' },
-        { name: 'Add hardware asset', how: '+ Add Hardware Asset, then edit its cells; or Add asset on a row in Discovered' },
+        { name: 'Add hardware asset', how: '📚 Library (Ctrl+Shift+L) — one or more parts from the BIM library, or one dropped on the table; or Add asset on a row in Discovered' },
         { name: 'Commissioning stage', how: 'Pick D0–D8 in the asset row' },
         { name: 'Mark all Air Ready', how: '✓ Mark All Air Ready' },
         { name: 'Show what is on the network', how: '⚡ Discovered (top bar)' },
@@ -206,10 +208,11 @@ export class ReadinessApp {
       if (panel) panel.hidden = !panel.hidden;
     });
 
-    document.getElementById('btn-add-device')?.addEventListener('click', () => {
-      this.model.addDevice();
-      this.changed();
-    });
+    // 📚 Library (ROAD-3572): every asset is a BIM part with its BIM reference — no blank, typed asset
+    const addItems = (items) => { for (const it of items) this.model.addFromPart(it.bim, bimFields(it).bimRef); this.changed(); };
+    document.getElementById('btn-add-device')?.replaceWith(libraryButton(addItems, {
+      className: 'btn-action btn-small', title: 'Add hardware assets from the BIM library', multiple: true }));
+    if (this.tableHost) acceptLibraryDrops(this.tableHost, (it) => addItems([it]));
 
     document.getElementById('btn-mark-all')?.addEventListener('click', () => {
       this.model.setAllAirReady();
@@ -298,7 +301,7 @@ export class ReadinessApp {
       id: 'readiness-assets',
       columns: [
         { key: 'id', label: 'Asset #', editable: false, mono: true },
-        { key: 'name', label: 'Equipment Model & Description' },
+        { key: 'name', label: 'Equipment Model & Description', editable: false },   // the part's (ROAD-3572)
         { key: 'location', label: 'Physical Location / Rack' },
         { key: 'stage', label: 'Commissioning Stage', render: (_v, _row, i) => this.stageCell(dev(i)) },
         { key: 'targetDate', label: 'Target Date', mono: true },
@@ -314,6 +317,6 @@ export class ReadinessApp {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
-    new ReadinessApp();
+    window.readinessApp = new ReadinessApp();
   });
 }

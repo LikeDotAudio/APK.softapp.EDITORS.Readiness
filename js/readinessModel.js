@@ -8,13 +8,9 @@ export const READINESS_BLOCK_TYPE = 'readiness_rollup';
 export class ReadinessModel {
   constructor(planName = 'SYSTEM-READINESS-ROLLUP') {
     this.planName = planName;
-    this.devices = [
-      { id: 'dev-1', name: 'Core DSP Matrix (Q-SYS Core 110f)', location: 'Rack 01', stage: 'd8', targetDate: '2026-11-15' },
-      { id: 'dev-2', name: 'Primary Switch (Cisco CBS350-24P)', location: 'Rack 01', stage: 'd5', targetDate: '2026-11-15' },
-      { id: 'dev-3', name: 'Power Amplifier (Powersoft Ottocanali)', location: 'Rack 02', stage: 'd3', targetDate: '2026-11-15' },
-      { id: 'dev-4', name: 'Wireless Mic Receiver (Shure ULXD4Q)', location: 'Rack 01', stage: 'd2', targetDate: '2026-11-15' },
-      { id: 'dev-5', name: 'Touch Controller (TS-1070)', location: 'Control Room Wall', stage: 'd1', targetDate: '2026-11-15' }
-    ];
+    /* No demo assets: each comes from the BIM library (📚 Library, ROAD-3572), from
+       Discovered, or from an opened block. */
+    this.devices = [];
   }
 
   addDevice(device = {}) {
@@ -25,7 +21,8 @@ export class ReadinessModel {
       stage: device.stage || 'd0',
       targetDate: device.targetDate || '2026-11-30'
     };
-    for (const k of ['mac', 'serial']) if (device[k]) d[k] = String(device[k]);
+    for (const k of ['mac', 'serial', 'bimId']) if (device[k]) d[k] = String(device[k]);
+    if (device.bimRef && device.bimRef.part) d.bimRef = { ...device.bimRef };   // the BIM reference (ROAD-3572)
     this.devices.push(d);
     return d;
   }
@@ -41,6 +38,22 @@ export class ReadinessModel {
     if (this.devices[index]) {
       this.devices[index][field] = value;
     }
+  }
+
+  /** An asset for a part picked from the BIM library: its name is the part's, it keeps bimId and
+      bimRef {part, url, rev} (bimLibrary.js bimFields). Each pick is one more asset — two of a
+      model are two boxes to commission. */
+  addFromPart(part = {}, bimRef = null) {
+    let n = this.devices.length + 1;
+    while (this.devices.some(d => d.id === `dev-${n}`)) n++;
+    return this.addDevice({
+      id: `dev-${n}`,
+      name: part.name || [part.manufacturer, part.model].filter(Boolean).join(' ') || part.id,
+      location: '',
+      stage: 'd0',
+      bimId: part.id || '',
+      bimRef: bimRef || part.ref || null
+    });
   }
 
   /** An asset for one discovered thing, keyed by MAC / serial (never IP); stage d0 until someone stages it. */
